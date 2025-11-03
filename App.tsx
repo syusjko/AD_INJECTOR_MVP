@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { generateTextStream, generateSponsoredSuggestion } from './services/geminiService';
 import NavSidebar from './components/NavSidebar';
 import PromptInput from './components/PromptInput';
@@ -15,6 +15,13 @@ const App: React.FC = () => {
     const [isSuggestionLoading, setIsSuggestionLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [hasGenerated, setHasGenerated] = useState<boolean>(false);
+    const mainContentRef = useRef<HTMLElement>(null);
+
+    useEffect(() => {
+        if (mainContentRef.current) {
+            mainContentRef.current.scrollTop = mainContentRef.current.scrollHeight;
+        }
+    }, [originalResponse, sponsoredSuggestion]);
 
     const handleGenerate = useCallback(async () => {
         if (!originalPrompt.trim()) {
@@ -27,24 +34,7 @@ const App: React.FC = () => {
         setSponsoredSuggestion(null);
         setOriginalResponse('');
         setIsLoading(true);
-        setIsSuggestionLoading(true);
         setSubmittedPrompt(originalPrompt);
-
-        // --- Concurrent Generation ---
-
-        generateSponsoredSuggestion(originalPrompt)
-            .then(suggestion => {
-                if (!suggestion?.suggestionText) {
-                    throw new Error("Failed to generate a valid sponsored suggestion.");
-                }
-                setSponsoredSuggestion(suggestion);
-            })
-            .catch(err => {
-                console.error("Suggestion generation failed:", err);
-            })
-            .finally(() => {
-                setIsSuggestionLoading(false);
-            });
 
         try {
             const stream = await generateTextStream(originalPrompt);
@@ -61,15 +51,32 @@ const App: React.FC = () => {
             setError(err instanceof Error ? err.message : 'Failed to generate response.');
         } finally {
             setIsLoading(false);
+            
+            // Generate suggestion AFTER the main response is complete
+            setIsSuggestionLoading(true);
+            generateSponsoredSuggestion(originalPrompt)
+                .then(suggestion => {
+                    if (!suggestion?.suggestionText) {
+                        throw new Error("Failed to generate a valid sponsored suggestion.");
+                    }
+                    setSponsoredSuggestion(suggestion);
+                })
+                .catch(err => {
+                    console.error("Suggestion generation failed:", err);
+                    // Optionally set an error state for the suggestion part
+                })
+                .finally(() => {
+                    setIsSuggestionLoading(false);
+                });
         }
 
     }, [originalPrompt]);
 
     return (
-        <div className="flex min-h-screen bg-white font-sans">
+        <div className="flex h-screen bg-white font-sans">
             <NavSidebar />
-            <main className="flex-1 p-6 flex flex-col items-center">
-                <div className="w-full max-w-4xl flex-grow">
+            <main ref={mainContentRef} className="ml-64 flex-1 flex flex-col items-center overflow-y-auto">
+                <div className="w-full max-w-4xl flex-grow p-6">
                     {!hasGenerated ? (
                         <div className="max-w-3xl mx-auto pt-20">
                             <h1 className="text-4xl font-bold text-center text-gray-800">무엇이 궁금하신가요?</h1>
@@ -89,26 +96,24 @@ const App: React.FC = () => {
                             <div className="border-b border-gray-200 pb-4">
                                <h1 className="text-2xl font-semibold text-gray-800">{submittedPrompt}</h1>
                             </div>
-                            <div className="mt-6 flex flex-col lg:flex-row gap-8">
-                                <div className="flex-auto">
-                                    <ResponseDisplay
-                                        title="AI 응답"
-                                        content={originalResponse}
-                                        isLoading={isLoading}
-                                    />
-                                </div>
-                                <aside className="w-full lg:w-[320px] lg:flex-shrink-0">
+                            <div className="mt-6 flex flex-col gap-8">
+                                <ResponseDisplay
+                                    title="AI 응답"
+                                    content={originalResponse}
+                                    isLoading={isLoading}
+                                />
+                                {(!isLoading || originalResponse) && // Show only after initial loading or if there's content
                                     <SponsoredContent
                                         suggestion={sponsoredSuggestion}
                                         isLoading={isSuggestionLoading}
                                     />
-                                </aside>
+                                }
                             </div>
                          </div>
                     )}
                 </div>
                 {hasGenerated && (
-                    <div className="mt-auto pt-6 w-full max-w-4xl">
+                    <div className="sticky bottom-0 w-full max-w-4xl bg-white/80 backdrop-blur-sm pt-4 pb-6 px-6">
                          <div className="relative">
                             <input
                                 type="text"

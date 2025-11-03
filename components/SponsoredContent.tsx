@@ -1,3 +1,4 @@
+
 import React from 'react';
 import Banner from './Banner';
 import { LightbulbIcon } from './icons/LightbulbIcon';
@@ -7,6 +8,7 @@ interface SponsoredSuggestion {
     headline: string;
     cta: string;
     url: string;
+    imageUrl: string;
 }
 
 interface SponsoredContentProps {
@@ -21,31 +23,44 @@ const LoadingSpinner: React.FC = () => (
 );
 
 const SponsoredContent: React.FC<SponsoredContentProps> = ({ suggestion, isLoading }) => {
+    if (isLoading) {
+        return (
+            <div className="bg-gray-50/70 border border-gray-200 rounded-lg p-4 flex flex-col">
+                <h3 className="text-md font-semibold text-gray-600 mb-3 flex items-center gap-2">
+                    <LightbulbIcon />
+                    관련 추천 (Sponsored)
+                </h3>
+                <LoadingSpinner />
+            </div>
+        );
+    }
+
+    if (!suggestion) {
+        return null; // Don't render anything if there's no suggestion and not loading
+    }
+    
     return (
-        <div className="bg-gray-50/70 border border-gray-200 rounded-lg p-4 flex flex-col h-full">
+        <div className="bg-gray-50/70 border border-gray-200 rounded-lg p-4 flex flex-col animate-fade-in">
              <h3 className="text-md font-semibold text-gray-600 mb-3 flex items-center gap-2">
                 <LightbulbIcon />
                 관련 추천 (Sponsored)
             </h3>
-            <div className="flex-grow">
-                {isLoading ? (
-                    <LoadingSpinner />
-                ) : suggestion ? (
-                    <div className="space-y-4 animate-fade-in">
-                        <p className="text-gray-600 whitespace-pre-wrap font-light leading-relaxed text-sm">
-                            {suggestion.suggestionText}
-                        </p>
-                        <Banner
-                            headline={suggestion.headline}
-                            cta={suggestion.cta}
-                            url={suggestion.url}
-                        />
-                    </div>
-                ) : (
-                    <div className="flex items-center justify-center h-full">
-                        <p className="text-gray-400 italic text-sm">추천 정보가 여기에 표시됩니다.</p>
-                    </div>
-                )}
+            <div className="space-y-4">
+                 {suggestion.imageUrl && (
+                    <img 
+                        src={suggestion.imageUrl} 
+                        alt={suggestion.headline}
+                        className="w-full rounded-lg object-cover aspect-video shadow-sm" 
+                    />
+                 )}
+                <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                    {suggestion.suggestionText}
+                </p>
+                <Banner
+                    headline={suggestion.headline}
+                    cta={suggestion.cta}
+                    url={suggestion.url}
+                />
             </div>
         </div>
     );

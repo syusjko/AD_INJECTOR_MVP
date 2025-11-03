@@ -6,13 +6,13 @@ import { SignInIcon } from './icons/SignInIcon';
 
 const NavSidebar: React.FC = () => {
     return (
-        <nav className="w-64 h-screen bg-gray-50 border-r border-gray-200 p-4 flex flex-col">
+        <nav className="fixed top-0 left-0 w-64 h-screen bg-gray-50 border-r border-gray-200 p-4 flex flex-col">
             <div className="flex items-center gap-2 mb-8">
                 <svg className="h-8 w-8 text-indigo-600" viewBox="0 0 24 24" fill="currentColor">
                     <path fillRule="evenodd" d="M11.25 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S16.635 2.25 11.25 2.25zm0 1.5a8.25 8.25 0 100 16.5 8.25 8.25 0 000-16.5z" clipRule="evenodd" />
                     <path d="M12.75 12a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z" />
                 </svg>
-                <span className="font-bold text-xl text-gray-800">perplexity</span>
+                <span className="font-bold text-xl text-gray-800">optillm</span>
             </div>
             
             <button className="w-full text-left px-3 py-2 border border-gray-300 rounded-md text-gray-600 hover:bg-gray-200 transition-colors">

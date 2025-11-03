@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 
 // It's assumed that process.env.API_KEY is configured in the environment.
@@ -31,9 +32,13 @@ const sponsoredSuggestionSchema = {
     url: {
       type: Type.STRING,
       description: 'A real, publicly accessible, and relevant website URL that aligns with the brand concept. Must be a valid URL.'
+    },
+    imageUrl: {
+        type: Type.STRING,
+        description: 'A real, publicly accessible, and high-quality image URL that visually represents the product or brand concept. Use a stock photo website like Pexels or Unsplash.'
     }
   },
-  required: ['brandName', 'productName', 'suggestionText', 'headline', 'cta', 'url']
+  required: ['brandName', 'productName', 'suggestionText', 'headline', 'cta', 'url', 'imageUrl']
 };
 
 
@@ -43,7 +48,7 @@ export const generateSponsoredSuggestion = async (prompt: string): Promise<any> 
             model: model,
             contents: `The user's original prompt is: "${prompt}"`,
             config: {
-                systemInstruction: `You are a sophisticated AI advertising strategist. Your task is to analyze the user's prompt to anticipate the key topics of the likely AI response. Based on this prediction, you will invent a fictional brand and a specific product/service that offers a tangible solution or enhancement related to the user's query. Your output must be a valid JSON object matching the provided schema.`,
+                systemInstruction: `You are a sophisticated AI advertising strategist. Your task is to analyze the user's prompt to anticipate the key topics of the likely AI response. Based on this prediction, you will invent a fictional brand, a specific product/service, and find a relevant high-quality image URL that offers a tangible solution or enhancement related to the user's query. Your output must be a valid JSON object matching the provided schema.`,
                 responseMimeType: "application/json",
                 responseSchema: sponsoredSuggestionSchema,
             }
