@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface ResponseDisplayProps {
@@ -18,7 +17,7 @@ const ResponseDisplay: React.FC<ResponseDisplayProps> = ({ title, content, isLoa
         <div className="bg-gray-800/50 border border-gray-700 rounded-lg shadow-lg p-6 flex flex-col h-full min-h-[300px]">
             <h3 className="text-xl font-bold text-indigo-400 mb-4">{title}</h3>
             <div className="flex-grow overflow-y-auto">
-                {isLoading ? (
+                {isLoading && !content ? (
                     <LoadingSpinner />
                 ) : (
                     <p className="text-gray-300 whitespace-pre-wrap font-light leading-relaxed">

@@ -1,9 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { generateText } from './services/geminiService';
+import { generateTextStream } from './services/geminiService';
 import Header from './components/Header';
 import PromptInput from './components/PromptInput';
 import ResponseDisplay from './components/ResponseDisplay';
 import { MagicIcon } from './components/icons/MagicIcon';
+import { GenerateContentResponse } from '@google/genai';
+
 
 const App: React.FC = () => {
     const [originalPrompt, setOriginalPrompt] = useState<string>('Describe the benefits of drinking coffee in the morning.');
@@ -31,22 +33,47 @@ const App: React.FC = () => {
 User Prompt: "${originalPrompt}"`;
 
         try {
-            // Generate Ad Instruction and Original Response in parallel
-            const [adInstructionResult, originalResult] = await Promise.all([
-                generateText(adGenerationPrompt),
-                generateText(originalPrompt)
+            // Helper function to process streams and update state
+            const processStream = async (
+                streamPromise: Promise<AsyncGenerator<GenerateContentResponse>>,
+                stateUpdater: React.Dispatch<React.SetStateAction<string>>
+            ): Promise<string> => {
+                const stream = await streamPromise;
+                let fullText = "";
+                for await (const chunk of stream) {
+                    const text = chunk.text;
+                    if (text) {
+                        fullText += text;
+                        stateUpdater(prev => prev + text);
+                    }
+                }
+                return fullText;
+            };
+
+            // Start both initial generation streams
+            const originalStreamPromise = generateTextStream(originalPrompt);
+            const adInstructionStreamPromise = generateTextStream(adGenerationPrompt);
+
+            // Process streams concurrently and wait for both to finish
+            const [_, adInstructionResult] = await Promise.all([
+                processStream(originalStreamPromise, setOriginalResponse),
+                processStream(adInstructionStreamPromise, setGeneratedAdInstruction)
             ]);
 
-            setGeneratedAdInstruction(adInstructionResult);
-            setOriginalResponse(originalResult);
+            // Now that the ad instruction is complete, generate the ad-infused response
+            if (adInstructionResult) {
+                const modifiedPrompt = `${originalPrompt}\n\n---\n\n**Special Instruction:** Please analyze and subtly integrate the following advertising concept into your response: "${adInstructionResult}"`;
+                const adStreamPromise = generateTextStream(modifiedPrompt);
+                await processStream(adStreamPromise, setAdResponse);
+            }
 
-            // Now, generate the ad-infused response
-            const modifiedPrompt = `${originalPrompt}\n\n---\n\n**Special Instruction:** Please analyze and subtly integrate the following advertising concept into your response: "${adInstructionResult}"`;
-            const adResult = await generateText(modifiedPrompt);
-            setAdResponse(adResult);
         } catch (e) {
             console.error(e);
-            setError('Failed to generate responses. Please check the console for more details.');
+            let errorMessage = 'Failed to generate responses. Please check the console for more details.';
+            if (e instanceof Error) {
+                errorMessage = e.message;
+            }
+            setError(errorMessage);
             setHasGenerated(false);
         } finally {
             setIsLoading(false);
@@ -103,7 +130,7 @@ User Prompt: "${originalPrompt}"`;
                           <ResponseDisplay
                               title="Ad-Infused Response"
                               content={adResponse}
-                              isLoading={isLoading}
+                              isLoading={isLoading && !!generatedAdInstruction}
                           />
                       </div>
                   </div>
