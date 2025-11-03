@@ -1,0 +1,5 @@
+{
+  "name": "AD_INJECTOR_MVP",
+  "description": "An application to test how an injected advertising instruction alters the response of an LLM. Compare the standard response with an ad-infused version.",
+  "requestFramePermissions": []
+}
