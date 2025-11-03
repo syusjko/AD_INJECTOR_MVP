@@ -8,22 +8,21 @@ interface BannerProps {
 }
 
 const Banner: React.FC<BannerProps> = ({ headline, cta, url }) => {
-    // A simple guard to prevent rendering an invalid banner
     if (!headline || !cta || !url) {
         return null;
     }
 
     return (
-        <div className="bg-gray-900/60 rounded-lg p-4 flex items-center justify-between gap-4 animate-fade-in">
-            <div className="flex-1">
-                <h4 className="font-semibold text-gray-200">{headline}</h4>
-                <p className="text-sm text-gray-400 truncate" title={url}>{url}</p>
+        <div className="bg-gradient-to-br from-indigo-50 via-white to-blue-50 rounded-lg p-4 shadow-sm flex flex-col items-start justify-between gap-3 border border-gray-200">
+            <div className="w-full">
+                <p className="text-xs font-bold uppercase tracking-wider text-indigo-600">스폰서 추천 정보</p>
+                <h4 className="text-lg font-bold text-gray-800 mt-1">{headline}</h4>
             </div>
             <a
                 href={url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white font-bold rounded-md hover:bg-indigo-600 transition-all transform hover:scale-105 shadow-md shrink-0"
+                className="flex items-center justify-center gap-2 w-full px-4 py-2 bg-indigo-600 text-white font-bold rounded-md hover:bg-indigo-700 transition-all transform hover:scale-105 shadow-sm"
             >
                 <span>{cta}</span>
                 <ExternalLinkIcon />
@@ -31,18 +30,5 @@ const Banner: React.FC<BannerProps> = ({ headline, cta, url }) => {
         </div>
     );
 };
-
-// CSS for the fade-in animation
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    .animate-fade-in {
-        animation: fadeIn 0.5s ease-out forwards;
-    }
-`;
-document.head.append(style);
 
 export default Banner;

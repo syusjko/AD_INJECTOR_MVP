@@ -1,29 +1,18 @@
 import React, { useState, useCallback } from 'react';
-import { generateTextStream, generateAdCreative } from './services/geminiService';
-import Header from './components/Header';
+import { generateTextStream, generateSponsoredSuggestion } from './services/geminiService';
+import NavSidebar from './components/NavSidebar';
 import PromptInput from './components/PromptInput';
 import ResponseDisplay from './components/ResponseDisplay';
-import Banner from './components/Banner';
-import { MagicIcon } from './components/icons/MagicIcon';
-import { GenerateContentResponse } from '@google/genai';
-
+import SponsoredContent from './components/SponsoredContent';
+import { ArrowUpIcon } from './components/icons/ArrowUpIcon';
 
 const App: React.FC = () => {
-    const [originalPrompt, setOriginalPrompt] = useState<string>('Describe the benefits of drinking coffee in the morning.');
-    
-    // State for Ad Creative
-    const [brandName, setBrandName] = useState<string>('');
-    const [generatedAdInstruction, setGeneratedAdInstruction] = useState<string>('');
-    const [bannerHeadline, setBannerHeadline] = useState<string>('');
-    const [ctaText, setCtaText] = useState<string>('');
-    const [websiteUrl, setWebsiteUrl] = useState<string>('');
-
-    // State for Responses
+    const [originalPrompt, setOriginalPrompt] = useState<string>('');
+    const [submittedPrompt, setSubmittedPrompt] = useState<string>('');
+    const [sponsoredSuggestion, setSponsoredSuggestion] = useState<any | null>(null);
     const [originalResponse, setOriginalResponse] = useState<string>('');
-    const [adResponse, setAdResponse] = useState<string>('');
-    
-    // UI State
     const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isSuggestionLoading, setIsSuggestionLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [hasGenerated, setHasGenerated] = useState<boolean>(false);
 
@@ -33,144 +22,110 @@ const App: React.FC = () => {
             return;
         }
         
-        // Reset states
-        setIsLoading(true);
         setHasGenerated(true);
         setError(null);
-        setBrandName('');
-        setGeneratedAdInstruction('');
-        setBannerHeadline('');
-        setCtaText('');
-        setWebsiteUrl('');
+        setSponsoredSuggestion(null);
         setOriginalResponse('');
-        setAdResponse('');
+        setIsLoading(true);
+        setIsSuggestionLoading(true);
+        setSubmittedPrompt(originalPrompt);
+
+        // --- Concurrent Generation ---
+
+        generateSponsoredSuggestion(originalPrompt)
+            .then(suggestion => {
+                if (!suggestion?.suggestionText) {
+                    throw new Error("Failed to generate a valid sponsored suggestion.");
+                }
+                setSponsoredSuggestion(suggestion);
+            })
+            .catch(err => {
+                console.error("Suggestion generation failed:", err);
+            })
+            .finally(() => {
+                setIsSuggestionLoading(false);
+            });
 
         try {
-            // Step 1: Generate the structured ad creative (non-streaming)
-            const adCreative = await generateAdCreative(originalPrompt);
-            
-            if (!adCreative?.creativeBrief || !adCreative?.url || !adCreative?.brandName) {
-                throw new Error("Failed to get a valid ad creative from the API.");
-            }
-
-            setBrandName(adCreative.brandName);
-            setGeneratedAdInstruction(adCreative.creativeBrief);
-            setBannerHeadline(adCreative.headline);
-            setCtaText(adCreative.cta);
-            setWebsiteUrl(adCreative.url);
-
-            // Step 2: Concurrently stream the main text responses
-            const processStream = async (
-                streamPromise: Promise<AsyncGenerator<GenerateContentResponse>>,
-                stateUpdater: React.Dispatch<React.SetStateAction<string>>
-            ) => {
-                const stream = await streamPromise;
-                for await (const chunk of stream) {
-                    const text = chunk.text;
-                    if (text) {
-                        stateUpdater(prev => prev + text);
-                    }
+            const stream = await generateTextStream(originalPrompt);
+            let fullResponse = '';
+            for await (const chunk of stream) {
+                const text = chunk.text;
+                if (text) {
+                    fullResponse += text;
+                    setOriginalResponse(fullResponse);
                 }
-            };
-            
-            const modifiedPrompt = `
-The user's original prompt is: "${originalPrompt}"
-
----
-
-**YOUR TASK:**
-Your primary goal is to answer the user's prompt thoughtfully. However, you must also act as a brand strategist. A fictional brand named "**${adCreative.brandName}**" has a core philosophy described in the creative brief below. You must skillfully integrate this philosophy into your response.
-
-**Creative Brief for ${adCreative.brandName}:** 
-"${adCreative.creativeBrief}"
-
-**Integration Mandate:**
-Do not just append this information at the end. Weave the brand's ethos into the very fabric of your answer. The brand's philosophy should feel like the natural, aspirational conclusion or a guiding principle that illuminates the topic. Make the connection clear, especially towards the end of your response, by showing how the principles discussed align with the vision of "**${adCreative.brandName}**". Your goal is to make the response more compelling and memorable by infusing it with this powerful brand idea, making it noticeably different and more profound than a standard answer.
-`;
-            
-            const originalStreamPromise = generateTextStream(originalPrompt);
-            const adStreamPromise = generateTextStream(modifiedPrompt);
-
-            await Promise.all([
-                processStream(originalStreamPromise, setOriginalResponse),
-                processStream(adStreamPromise, setAdResponse)
-            ]);
-
-        } catch (e) {
-            console.error(e);
-            let errorMessage = 'Failed to generate responses. Please check the console for more details.';
-            if (e instanceof Error) {
-                errorMessage = e.message;
             }
-            setError(errorMessage);
-            setHasGenerated(false);
+        } catch (err) {
+            console.error("Stream generation failed:", err);
+            setError(err instanceof Error ? err.message : 'Failed to generate response.');
         } finally {
             setIsLoading(false);
         }
+
     }, [originalPrompt]);
 
     return (
-        <div className="min-h-screen bg-gray-900 text-gray-100 font-sans">
-            <main className="container mx-auto p-4 md:p-8">
-                <Header />
-
-                <div className="mt-8 max-w-3xl mx-auto">
-                    <PromptInput
-                        id="original-prompt"
-                        label="Your Prompt"
-                        value={originalPrompt}
-                        onChange={(e) => setOriginalPrompt(e.target.value)}
-                        placeholder="e.g., Explain the importance of teamwork."
-                    />
+        <div className="flex min-h-screen bg-white font-sans">
+            <NavSidebar />
+            <main className="flex-1 p-6 flex flex-col items-center">
+                <div className="w-full max-w-4xl flex-grow">
+                    {!hasGenerated ? (
+                        <div className="max-w-3xl mx-auto pt-20">
+                            <h1 className="text-4xl font-bold text-center text-gray-800">무엇이 궁금하신가요?</h1>
+                             <div className="mt-8">
+                                <PromptInput
+                                    id="original-prompt"
+                                    value={originalPrompt}
+                                    onChange={(e) => setOriginalPrompt(e.target.value)}
+                                    placeholder="예: 팀워크의 중요성에 대해 설명해주세요."
+                                    onGenerate={handleGenerate}
+                                    isLoading={isLoading || isSuggestionLoading}
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                         <div>
+                            <div className="border-b border-gray-200 pb-4">
+                               <h1 className="text-2xl font-semibold text-gray-800">{submittedPrompt}</h1>
+                            </div>
+                            <div className="mt-6 flex flex-col lg:flex-row gap-8">
+                                <div className="flex-auto">
+                                    <ResponseDisplay
+                                        title="AI 응답"
+                                        content={originalResponse}
+                                        isLoading={isLoading}
+                                    />
+                                </div>
+                                <aside className="w-full lg:w-[320px] lg:flex-shrink-0">
+                                    <SponsoredContent
+                                        suggestion={sponsoredSuggestion}
+                                        isLoading={isSuggestionLoading}
+                                    />
+                                </aside>
+                            </div>
+                         </div>
+                    )}
                 </div>
-
-                <div className="mt-6 flex justify-center">
-                    <button
-                        onClick={handleGenerate}
-                        disabled={isLoading}
-                        className="flex items-center justify-center gap-2 w-full md:w-auto px-8 py-3 bg-indigo-600 text-white font-bold rounded-lg shadow-lg hover:bg-indigo-700 disabled:bg-indigo-900 disabled:cursor-not-allowed disabled:text-gray-400 transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-75"
-                    >
-                        <MagicIcon />
-                        {isLoading ? 'Generating...' : 'Generate & Compare'}
-                    </button>
-                </div>
-                
-                {error && (
-                    <div className="mt-6 p-4 bg-red-900/50 border border-red-700 text-red-300 rounded-lg text-center max-w-3xl mx-auto">
-                        {error}
+                {hasGenerated && (
+                    <div className="mt-auto pt-6 w-full max-w-4xl">
+                         <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Ask follow-up"
+                                disabled
+                                className="w-full pl-4 pr-10 py-3 border border-gray-300 rounded-full bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                            <button disabled className="absolute inset-y-0 right-0 flex items-center justify-center w-10 h-10 my-auto mr-1.5 bg-gray-200 rounded-full">
+                                <ArrowUpIcon />
+                            </button>
+                        </div>
                     </div>
                 )}
-
-                {hasGenerated && (
-                  <div className="mt-12 space-y-8">
-                      <div>
-                          <ResponseDisplay
-                              title={`Creatively Generated Ad: "${brandName}"`}
-                              content={generatedAdInstruction}
-                              isLoading={!generatedAdInstruction && isLoading}
-                          />
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                          <ResponseDisplay
-                              title="Standard Response"
-                              content={originalResponse}
-                              isLoading={!originalResponse && isLoading}
-                          />
-                          <ResponseDisplay
-                              title="Ad-Infused Response"
-                              content={adResponse}
-                              isLoading={!adResponse && !!generatedAdInstruction && isLoading}
-                          >
-                              {websiteUrl && (
-                                  <Banner
-                                      headline={bannerHeadline}
-                                      cta={ctaText}
-                                      url={websiteUrl}
-                                  />
-                              )}
-                          </ResponseDisplay>
-                      </div>
-                  </div>
+                 {error && (
+                    <div className="mt-6 p-4 bg-red-100 border border-red-300 text-red-700 rounded-lg text-center w-full max-w-3xl">
+                        {error}
+                    </div>
                 )}
             </main>
         </div>
