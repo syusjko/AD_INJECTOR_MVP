@@ -4,6 +4,7 @@ interface ResponseDisplayProps {
     title: string;
     content: string;
     isLoading: boolean;
+    children?: React.ReactNode;
 }
 
 const LoadingSpinner: React.FC = () => (
@@ -12,7 +13,7 @@ const LoadingSpinner: React.FC = () => (
     </div>
 );
 
-const ResponseDisplay: React.FC<ResponseDisplayProps> = ({ title, content, isLoading }) => {
+const ResponseDisplay: React.FC<ResponseDisplayProps> = ({ title, content, isLoading, children }) => {
     return (
         <div className="bg-gray-800/50 border border-gray-700 rounded-lg shadow-lg p-6 flex flex-col h-full min-h-[300px]">
             <h3 className="text-xl font-bold text-indigo-400 mb-4">{title}</h3>
@@ -21,10 +22,11 @@ const ResponseDisplay: React.FC<ResponseDisplayProps> = ({ title, content, isLoa
                     <LoadingSpinner />
                 ) : (
                     <p className="text-gray-300 whitespace-pre-wrap font-light leading-relaxed">
-                        {content || 'Response will appear here...'}
+                        {content || (isLoading ? '' : 'Response will appear here...')}
                     </p>
                 )}
             </div>
+            {children && <div className="mt-4 border-t border-gray-700 pt-4">{children}</div>}
         </div>
     );
 };

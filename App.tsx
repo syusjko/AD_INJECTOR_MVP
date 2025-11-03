@@ -1,17 +1,28 @@
 import React, { useState, useCallback } from 'react';
-import { generateTextStream } from './services/geminiService';
+import { generateTextStream, generateAdCreative } from './services/geminiService';
 import Header from './components/Header';
 import PromptInput from './components/PromptInput';
 import ResponseDisplay from './components/ResponseDisplay';
+import Banner from './components/Banner';
 import { MagicIcon } from './components/icons/MagicIcon';
 import { GenerateContentResponse } from '@google/genai';
 
 
 const App: React.FC = () => {
     const [originalPrompt, setOriginalPrompt] = useState<string>('Describe the benefits of drinking coffee in the morning.');
+    
+    // State for Ad Creative
+    const [brandName, setBrandName] = useState<string>('');
     const [generatedAdInstruction, setGeneratedAdInstruction] = useState<string>('');
+    const [bannerHeadline, setBannerHeadline] = useState<string>('');
+    const [ctaText, setCtaText] = useState<string>('');
+    const [websiteUrl, setWebsiteUrl] = useState<string>('');
+
+    // State for Responses
     const [originalResponse, setOriginalResponse] = useState<string>('');
     const [adResponse, setAdResponse] = useState<string>('');
+    
+    // UI State
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [hasGenerated, setHasGenerated] = useState<boolean>(false);
@@ -21,51 +32,69 @@ const App: React.FC = () => {
             setError('Please enter a prompt.');
             return;
         }
+        
+        // Reset states
         setIsLoading(true);
         setHasGenerated(true);
         setError(null);
+        setBrandName('');
         setGeneratedAdInstruction('');
+        setBannerHeadline('');
+        setCtaText('');
+        setWebsiteUrl('');
         setOriginalResponse('');
         setAdResponse('');
 
-        const adGenerationPrompt = `Analyze the user's prompt below. Based on its core themes, conceptualize a fictional, high-concept brand or product. The brand should feel abstract and aspirational. Then, write a detailed advertising creative brief for this brand in 2-3 sentences. This brief should guide an AI to subtly weave the brand's ethos into a response, rather than directly mentioning a product.
-
-User Prompt: "${originalPrompt}"`;
-
         try {
-            // Helper function to process streams and update state
+            // Step 1: Generate the structured ad creative (non-streaming)
+            const adCreative = await generateAdCreative(originalPrompt);
+            
+            if (!adCreative?.creativeBrief || !adCreative?.url || !adCreative?.brandName) {
+                throw new Error("Failed to get a valid ad creative from the API.");
+            }
+
+            setBrandName(adCreative.brandName);
+            setGeneratedAdInstruction(adCreative.creativeBrief);
+            setBannerHeadline(adCreative.headline);
+            setCtaText(adCreative.cta);
+            setWebsiteUrl(adCreative.url);
+
+            // Step 2: Concurrently stream the main text responses
             const processStream = async (
                 streamPromise: Promise<AsyncGenerator<GenerateContentResponse>>,
                 stateUpdater: React.Dispatch<React.SetStateAction<string>>
-            ): Promise<string> => {
+            ) => {
                 const stream = await streamPromise;
-                let fullText = "";
                 for await (const chunk of stream) {
                     const text = chunk.text;
                     if (text) {
-                        fullText += text;
                         stateUpdater(prev => prev + text);
                     }
                 }
-                return fullText;
             };
+            
+            const modifiedPrompt = `
+The user's original prompt is: "${originalPrompt}"
 
-            // Start both initial generation streams
+---
+
+**YOUR TASK:**
+Your primary goal is to answer the user's prompt thoughtfully. However, you must also act as a brand strategist. A fictional brand named "**${adCreative.brandName}**" has a core philosophy described in the creative brief below. You must skillfully integrate this philosophy into your response.
+
+**Creative Brief for ${adCreative.brandName}:** 
+"${adCreative.creativeBrief}"
+
+**Integration Mandate:**
+Do not just append this information at the end. Weave the brand's ethos into the very fabric of your answer. The brand's philosophy should feel like the natural, aspirational conclusion or a guiding principle that illuminates the topic. Make the connection clear, especially towards the end of your response, by showing how the principles discussed align with the vision of "**${adCreative.brandName}**". Your goal is to make the response more compelling and memorable by infusing it with this powerful brand idea, making it noticeably different and more profound than a standard answer.
+`;
+            
             const originalStreamPromise = generateTextStream(originalPrompt);
-            const adInstructionStreamPromise = generateTextStream(adGenerationPrompt);
+            const adStreamPromise = generateTextStream(modifiedPrompt);
 
-            // Process streams concurrently and wait for both to finish
-            const [_, adInstructionResult] = await Promise.all([
+            await Promise.all([
                 processStream(originalStreamPromise, setOriginalResponse),
-                processStream(adInstructionStreamPromise, setGeneratedAdInstruction)
+                processStream(adStreamPromise, setAdResponse)
             ]);
-
-            // Now that the ad instruction is complete, generate the ad-infused response
-            if (adInstructionResult) {
-                const modifiedPrompt = `${originalPrompt}\n\n---\n\n**Special Instruction:** Please analyze and subtly integrate the following advertising concept into your response: "${adInstructionResult}"`;
-                const adStreamPromise = generateTextStream(modifiedPrompt);
-                await processStream(adStreamPromise, setAdResponse);
-            }
 
         } catch (e) {
             console.error(e);
@@ -116,22 +145,30 @@ User Prompt: "${originalPrompt}"`;
                   <div className="mt-12 space-y-8">
                       <div>
                           <ResponseDisplay
-                              title="Creatively Generated Ad Instruction"
+                              title={`Creatively Generated Ad: "${brandName}"`}
                               content={generatedAdInstruction}
-                              isLoading={isLoading}
+                              isLoading={!generatedAdInstruction && isLoading}
                           />
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                           <ResponseDisplay
                               title="Standard Response"
                               content={originalResponse}
-                              isLoading={isLoading}
+                              isLoading={!originalResponse && isLoading}
                           />
                           <ResponseDisplay
                               title="Ad-Infused Response"
                               content={adResponse}
-                              isLoading={isLoading && !!generatedAdInstruction}
-                          />
+                              isLoading={!adResponse && !!generatedAdInstruction && isLoading}
+                          >
+                              {websiteUrl && (
+                                  <Banner
+                                      headline={bannerHeadline}
+                                      cta={ctaText}
+                                      url={websiteUrl}
+                                  />
+                              )}
+                          </ResponseDisplay>
                       </div>
                   </div>
                 )}
