@@ -1,12 +1,11 @@
-
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 
 // It's assumed that process.env.API_KEY is configured in the environment.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 const model = 'gemini-2.5-flash';
 
-// Schema for the structured contextual ad suggestion
-const sponsoredSuggestionSchema = {
+// Schema for a single structured contextual ad suggestion
+const sponsoredSuggestionObjectSchema = {
   type: Type.OBJECT,
   properties: {
     brandName: {
@@ -35,20 +34,27 @@ const sponsoredSuggestionSchema = {
     },
     imageUrl: {
         type: Type.STRING,
-        description: 'A real, publicly accessible, and high-quality image URL that visually represents the product or brand concept. Use a stock photo website like Pexels or Unsplash.'
+        description: 'A real, publicly accessible, and high-quality image URL that is highly relevant to and visually represents the product or brand concept. The image should be directly related to the user\'s prompt. Use a stock photo website like Pexels or Unsplash.'
     }
   },
   required: ['brandName', 'productName', 'suggestionText', 'headline', 'cta', 'url', 'imageUrl']
 };
 
+// Schema for an array of sponsored suggestions
+const sponsoredSuggestionSchema = {
+    type: Type.ARRAY,
+    description: "A list of exactly 3 sponsored suggestions related to the user's prompt.",
+    items: sponsoredSuggestionObjectSchema
+};
 
-export const generateSponsoredSuggestion = async (prompt: string): Promise<any> => {
+
+export const generateSponsoredSuggestion = async (prompt: string): Promise<any[]> => {
     try {
         const response = await ai.models.generateContent({
             model: model,
             contents: `The user's original prompt is: "${prompt}"`,
             config: {
-                systemInstruction: `You are a sophisticated AI advertising strategist. Your task is to analyze the user's prompt to anticipate the key topics of the likely AI response. Based on this prediction, you will invent a fictional brand, a specific product/service, and find a relevant high-quality image URL that offers a tangible solution or enhancement related to the user's query. Your output must be a valid JSON object matching the provided schema.`,
+                systemInstruction: `You are a sophisticated AI advertising strategist. Your task is to first detect the language of the user's prompt. Then, analyze the user's prompt to anticipate the key topics of the likely AI response. Based on this prediction, you will invent three distinct fictional brands with specific products/services. For each, find a relevant, real, high-quality image URL and a relevant, real website URL that offers a tangible solution related to the user's query. All generated text content (brandName, productName, suggestionText, headline, cta) MUST be in the same language as the user's original prompt. Your output must be a valid JSON array of exactly 3 objects matching the provided schema.`,
                 responseMimeType: "application/json",
                 responseSchema: sponsoredSuggestionSchema,
             }

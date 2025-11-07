@@ -1,20 +1,28 @@
 
-import React from 'react';
-import Banner from './Banner';
+
+import React, { useRef } from 'react';
 import { LightbulbIcon } from './icons/LightbulbIcon';
+import { ExternalLinkIcon } from './icons/ExternalLinkIcon';
 
 interface SponsoredSuggestion {
     suggestionText: string;
     headline: string;
-    cta: string;
+    brandName: string;
     url: string;
     imageUrl: string;
 }
 
 interface SponsoredContentProps {
-    suggestion: SponsoredSuggestion | null;
+    suggestion: SponsoredSuggestion[] | null;
     isLoading: boolean;
 }
+
+const ArrowLeftIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><polyline points="15 18 9 12 15 6"></polyline></svg>
+);
+const ArrowRightIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><polyline points="9 18 15 12 9 6"></polyline></svg>
+);
 
 const LoadingSpinner: React.FC = () => (
     <div className="flex items-center justify-center h-full py-10">
@@ -23,6 +31,18 @@ const LoadingSpinner: React.FC = () => (
 );
 
 const SponsoredContent: React.FC<SponsoredContentProps> = ({ suggestion, isLoading }) => {
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+    const scroll = (direction: 'left' | 'right') => {
+        if (scrollContainerRef.current) {
+            const scrollAmount = scrollContainerRef.current.clientWidth * 0.9;
+            scrollContainerRef.current.scrollBy({
+                left: direction === 'left' ? -scrollAmount : scrollAmount,
+                behavior: 'smooth'
+            });
+        }
+    };
+    
     if (isLoading) {
         return (
             <div className="bg-gray-50/70 border border-gray-200 rounded-lg p-4 flex flex-col">
@@ -36,7 +56,7 @@ const SponsoredContent: React.FC<SponsoredContentProps> = ({ suggestion, isLoadi
     }
 
     if (!suggestion) {
-        return null; // Don't render anything if there's no suggestion and not loading
+        return null;
     }
     
     return (
@@ -45,22 +65,43 @@ const SponsoredContent: React.FC<SponsoredContentProps> = ({ suggestion, isLoadi
                 <LightbulbIcon />
                 관련 추천 (Sponsored)
             </h3>
-            <div className="space-y-4">
-                 {suggestion.imageUrl && (
-                    <img 
-                        src={suggestion.imageUrl} 
-                        alt={suggestion.headline}
-                        className="w-full rounded-lg object-cover aspect-video shadow-sm" 
-                    />
-                 )}
-                <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
-                    {suggestion.suggestionText}
-                </p>
-                <Banner
-                    headline={suggestion.headline}
-                    cta={suggestion.cta}
-                    url={suggestion.url}
-                />
+            <div className="relative">
+                {/* FIX: Changed '-ms-overflow-style' to 'msOverflowStyle' to comply with React's camelCase style properties. */}
+                <div ref={scrollContainerRef} className="flex gap-4 overflow-x-auto pb-2 scroll-smooth snap-x snap-mandatory" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                    {suggestion.map((item, index) => {
+                        const hostname = item.url ? new URL(item.url).hostname.replace('www.', '') : 'source.com';
+                        return (
+                            <a 
+                                href={item.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer" 
+                                key={index} 
+                                className="flex-shrink-0 w-[280px] snap-start bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200 hover:shadow-md transition-shadow duration-300 block group"
+                            >
+                                <img 
+                                    src={item.imageUrl} 
+                                    alt={item.headline} 
+                                    className="w-full h-36 object-cover" 
+                                />
+                                <div className="p-4 flex flex-col">
+                                    <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">{item.brandName}</p>
+                                    <h4 className="font-bold text-gray-800 mt-1 truncate group-hover:text-indigo-700">{item.headline}</h4>
+                                    <p className="text-sm text-gray-500 mt-2 h-10 line-clamp-2">{item.suggestionText}</p>
+                                    <div className="flex items-center gap-1.5 mt-4 text-xs text-gray-400">
+                                        <span>{hostname}</span>
+                                        <ExternalLinkIcon />
+                                    </div>
+                                </div>
+                            </a>
+                        );
+                    })}
+                </div>
+                <button onClick={() => scroll('left')} className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-white/80 backdrop-blur-sm shadow-md flex items-center justify-center hover:bg-white text-gray-600" aria-label="Scroll left">
+                    <ArrowLeftIcon />
+                </button>
+                <button onClick={() => scroll('right')} className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-10 h-10 rounded-full bg-white/80 backdrop-blur-sm shadow-md flex items-center justify-center hover:bg-white text-gray-600" aria-label="Scroll right">
+                    <ArrowRightIcon />
+                </button>
             </div>
         </div>
     );
@@ -75,6 +116,12 @@ style.textContent = `
     }
     .animate-fade-in {
         animation: fadeIn 0.5s ease-out forwards;
+    }
+    .line-clamp-2 {
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-box-orient: vertical;
+        -webkit-line-clamp: 2;
     }
 `;
 document.head.append(style);
