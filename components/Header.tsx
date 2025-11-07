@@ -16,7 +16,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ submittedPrompt }) => {
     return (
-        <header className="w-full bg-white/80 backdrop-blur-sm border-b border-gray-200 flex items-center justify-between px-6 z-10 h-20 shrink-0">
+        <header className="w-full bg-white/80 backdrop-blur-sm flex items-center justify-between px-6 z-10 h-20 shrink-0">
             <div className="flex items-center gap-4">
                 <h1 className="text-xl font-semibold text-gray-800 truncate">{submittedPrompt}</h1>
             </div>

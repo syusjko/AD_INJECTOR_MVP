@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { generateTextStream, generateSponsoredSuggestion } from './services/geminiService';
+import { generateTextStream, generateSponsoredSuggestion, generateThinkingSteps, generateSponsoredIntroText } from './services/geminiService';
 import NavSidebar from './components/NavSidebar';
 import PromptInput from './components/PromptInput';
 import ResponseDisplay from './components/ResponseDisplay';
@@ -7,22 +7,32 @@ import SponsoredContent from './components/SponsoredContent';
 import Header from './components/Header';
 import { ArrowUpIcon } from './components/icons/ArrowUpIcon';
 
+const defaultThinkingSteps = [
+    "결과 생성 중...",
+    "정보 분석 중...",
+    "응답 초안 작성 중...",
+    "내용 다듬는 중...",
+];
+
 const App: React.FC = () => {
     const [originalPrompt, setOriginalPrompt] = useState<string>('');
     const [submittedPrompt, setSubmittedPrompt] = useState<string>('');
     const [sponsoredSuggestion, setSponsoredSuggestion] = useState<any[] | null>(null);
     const [originalResponse, setOriginalResponse] = useState<string>('');
+    const [sponsoredIntro, setSponsoredIntro] = useState<string>('');
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [isSuggestionLoading, setIsSuggestionLoading] = useState<boolean>(false);
+    const [isIntroLoading, setIsIntroLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
     const [hasGenerated, setHasGenerated] = useState<boolean>(false);
+    const [thinkingSteps, setThinkingSteps] = useState<string[]>(defaultThinkingSteps);
     const mainContentRef = useRef<HTMLElement>(null);
 
     useEffect(() => {
         if (mainContentRef.current) {
             mainContentRef.current.scrollTop = mainContentRef.current.scrollHeight;
         }
-    }, [originalResponse]);
+    }, [originalResponse, sponsoredIntro]);
 
     const handleGenerate = useCallback(async () => {
         if (!originalPrompt.trim()) {
@@ -34,24 +44,32 @@ const App: React.FC = () => {
         setError(null);
         setSponsoredSuggestion(null);
         setOriginalResponse('');
+        setSponsoredIntro('');
         setSubmittedPrompt(originalPrompt);
-
+        setIsLoading(true);
         setIsSuggestionLoading(true);
+        setThinkingSteps(defaultThinkingSteps);
+
+        generateThinkingSteps(originalPrompt)
+            .then(steps => setThinkingSteps(steps))
+            .catch(err => {
+                console.warn("Failed to generate dynamic thinking steps, using default.", err);
+                setThinkingSteps(defaultThinkingSteps);
+            });
+
         let suggestionData: any[] | null = null;
         try {
             suggestionData = await generateSponsoredSuggestion(originalPrompt);
             if (!suggestionData || suggestionData.length === 0) {
-                throw new Error("Failed to generate valid sponsored suggestions.");
+                console.warn("Failed to generate valid sponsored suggestions.");
             }
             setSponsoredSuggestion(suggestionData);
         } catch (err) {
             console.error("Suggestion generation failed:", err);
-            setError(err instanceof Error ? `Suggestion Error: ${err.message}` : 'Failed to generate suggestion.');
         } finally {
             setIsSuggestionLoading(false);
         }
         
-        setIsLoading(true);
         try {
             let promptToSend = originalPrompt;
             if (suggestionData && suggestionData.length > 0) {
@@ -79,6 +97,21 @@ Begin your response to the user now.`;
                     setOriginalResponse(fullResponse);
                 }
             }
+            
+            // After stream is complete, generate intro text if we have suggestions
+            if (suggestionData && suggestionData.length > 0) {
+                setIsIntroLoading(true);
+                try {
+                    const introText = await generateSponsoredIntroText(originalPrompt, fullResponse);
+                    setSponsoredIntro(introText);
+                } catch (introErr) {
+                    console.error("Failed to generate sponsored intro text:", introErr);
+                    setSponsoredIntro("다음은 회원님의 질문과 관련하여 도움이 될 만한 몇 가지 추가 정보입니다.");
+                } finally {
+                    setIsIntroLoading(false);
+                }
+            }
+
         } catch (err) {
             console.error("Stream generation failed:", err);
             setError(err instanceof Error ? err.message : 'Failed to generate response.');
@@ -116,11 +149,14 @@ Begin your response to the user now.`;
                                         title="AI 응답"
                                         content={originalResponse}
                                         isLoading={isLoading}
+                                        thinkingSteps={thinkingSteps}
                                     />
-                                    {originalResponse && (
+                                    {!isLoading && hasGenerated && sponsoredSuggestion && (
                                         <SponsoredContent
                                             suggestion={sponsoredSuggestion}
                                             isLoading={isSuggestionLoading}
+                                            introText={sponsoredIntro}
+                                            isIntroLoading={isIntroLoading}
                                         />
                                     )}
                                 </div>
@@ -134,7 +170,7 @@ Begin your response to the user now.`;
                                     type="text"
                                     placeholder="Ask follow-up"
                                     disabled
-                                    className="w-full pl-4 pr-10 py-3 border border-gray-300 rounded-full bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    className="w-full pl-4 pr-10 py-3 border border-gray-200 rounded-full bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 />
                                 <button disabled className="absolute inset-y-0 right-0 flex items-center justify-center w-10 h-10 my-auto mr-1.5 bg-gray-200 rounded-full">
                                     <ArrowUpIcon />

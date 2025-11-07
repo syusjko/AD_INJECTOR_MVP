@@ -1,8 +1,11 @@
 
 
 import React, { useRef } from 'react';
+import { marked } from 'marked';
 import { LightbulbIcon } from './icons/LightbulbIcon';
 import { ExternalLinkIcon } from './icons/ExternalLinkIcon';
+import { SparklesIcon } from './icons/SparklesIcon';
+
 
 interface SponsoredSuggestion {
     suggestionText: string;
@@ -15,6 +18,8 @@ interface SponsoredSuggestion {
 interface SponsoredContentProps {
     suggestion: SponsoredSuggestion[] | null;
     isLoading: boolean;
+    introText: string;
+    isIntroLoading: boolean;
 }
 
 const ArrowLeftIcon = () => (
@@ -30,7 +35,7 @@ const LoadingSpinner: React.FC = () => (
     </div>
 );
 
-const SponsoredContent: React.FC<SponsoredContentProps> = ({ suggestion, isLoading }) => {
+const SponsoredContent: React.FC<SponsoredContentProps> = ({ suggestion, isLoading, introText, isIntroLoading }) => {
     const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const scroll = (direction: 'left' | 'right') => {
@@ -45,7 +50,7 @@ const SponsoredContent: React.FC<SponsoredContentProps> = ({ suggestion, isLoadi
     
     if (isLoading) {
         return (
-            <div className="bg-gray-50/70 border border-gray-200 rounded-lg p-4 flex flex-col">
+            <div className="p-4 flex flex-col">
                 <h3 className="text-md font-semibold text-gray-600 mb-3 flex items-center gap-2">
                     <LightbulbIcon />
                     관련 추천 (Sponsored)
@@ -58,15 +63,30 @@ const SponsoredContent: React.FC<SponsoredContentProps> = ({ suggestion, isLoadi
     if (!suggestion) {
         return null;
     }
+
+    const parsedIntro = introText ? marked.parse(introText) : '';
     
     return (
-        <div className="bg-gray-50/70 border border-gray-200 rounded-lg p-4 flex flex-col animate-fade-in">
+        <div className="p-4 flex flex-col animate-fade-in">
+            {isIntroLoading && (
+                <div className="mb-4 prose lg:prose-lg max-w-none">
+                    <div className="flex items-center gap-3 text-gray-600">
+                        <SparklesIcon className="w-6 h-6 text-indigo-500 animate-pulse" />
+                        <span className="font-semibold">추가 정보 준비 중...</span>
+                    </div>
+                </div>
+            )}
+             {introText && !isIntroLoading && (
+                <div 
+                    className="mb-4 prose lg:prose-lg max-w-none prose-p:text-gray-800"
+                    dangerouslySetInnerHTML={{ __html: parsedIntro }}
+                />
+            )}
              <h3 className="text-md font-semibold text-gray-600 mb-3 flex items-center gap-2">
                 <LightbulbIcon />
                 관련 추천 (Sponsored)
             </h3>
             <div className="relative">
-                {/* FIX: Changed '-ms-overflow-style' to 'msOverflowStyle' to comply with React's camelCase style properties. */}
                 <div ref={scrollContainerRef} className="flex gap-4 overflow-x-auto pb-2 scroll-smooth snap-x snap-mandatory" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                     {suggestion.map((item, index) => {
                         const hostname = item.url ? new URL(item.url).hostname.replace('www.', '') : 'source.com';
@@ -76,7 +96,7 @@ const SponsoredContent: React.FC<SponsoredContentProps> = ({ suggestion, isLoadi
                                 target="_blank" 
                                 rel="noopener noreferrer" 
                                 key={index} 
-                                className="flex-shrink-0 w-[280px] snap-start bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200 hover:shadow-md transition-shadow duration-300 block group"
+                                className="flex-shrink-0 w-[280px] snap-start bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-300 block group"
                             >
                                 <img 
                                     src={item.imageUrl} 

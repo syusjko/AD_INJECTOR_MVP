@@ -47,6 +47,12 @@ const sponsoredSuggestionSchema = {
     items: sponsoredSuggestionObjectSchema
 };
 
+const thinkingStepsSchema = {
+    type: Type.ARRAY,
+    description: "A list of 4-6 plausible, detailed thinking steps an AI would take to formulate a comprehensive response to the user's prompt.",
+    items: { type: Type.STRING }
+}
+
 
 export const generateSponsoredSuggestion = async (prompt: string): Promise<any[]> => {
     try {
@@ -70,6 +76,43 @@ export const generateSponsoredSuggestion = async (prompt: string): Promise<any[]
         throw new Error("An unknown error occurred while generating the sponsored suggestion.");
     }
 };
+
+export const generateThinkingSteps = async (prompt: string): Promise<string[]> => {
+    try {
+        const response = await ai.models.generateContent({
+            model: model,
+            contents: `Based on the user's prompt: "${prompt}"`,
+            config: {
+                systemInstruction: `You are a meta-cognition AI. Your task is to generate a plausible, high-level list of thinking steps that an advanced AI would take to answer the user's prompt. The steps should be specific to the prompt's topic. Generate between 4 and 6 distinct steps. The steps must be in the same language as the user's prompt (detect it first). Your output must be a valid JSON array of strings, where each string is a thinking step. For example, for "What is the importance of teamwork?", you might generate ["Defining teamwork and its core components", "Analyzing the psychological benefits for team members", "Outlining productivity advantages in a business context", "Summarizing with real-world examples"].`,
+                responseMimeType: "application/json",
+                responseSchema: thinkingStepsSchema,
+            }
+        });
+        const jsonText = response.text.trim();
+        return JSON.parse(jsonText);
+    } catch (error) {
+        console.error("Error generating thinking steps:", error);
+        // Don't throw a fatal error, the app can use a default.
+        return [];
+    }
+};
+
+export const generateSponsoredIntroText = async (prompt: string, mainResponse: string): Promise<string> => {
+    try {
+        const response = await ai.models.generateContent({
+            model: model,
+            contents: `User's prompt: "${prompt}"\n\nAI's response: "${mainResponse}"\n\nBased on the above, write the transition paragraph.`,
+            config: {
+                systemInstruction: `You are a helpful AI assistant. Your role is to write a short, engaging, and seamless transition paragraph. This paragraph should logically connect the user's initial query and the detailed AI response they just received to a set of related sponsored tools or resources that will be shown next. The tone must be conversational, helpful, and insightful, framing the upcoming suggestions as valuable next steps or practical applications of the information provided. It should NOT sound like an advertisement. All generated text MUST be in the same language as the user's original prompt. The output should be a single paragraph of plain text.`
+            }
+        });
+        return response.text;
+    } catch (error) {
+        console.error("Error generating sponsored intro text:", error);
+        return "다음은 회원님의 질문과 관련하여 도움이 될 만한 몇 가지 추가 정보입니다."; // Generic fallback
+    }
+}
+
 
 export const generateTextStream = async (prompt: string): Promise<AsyncGenerator<GenerateContentResponse>> => {
   try {
